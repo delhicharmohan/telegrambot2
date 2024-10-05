@@ -1,0 +1,48 @@
+<!-- views/checkout.ejs -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Checkout</title>
+</head>
+<body>
+  <button id="rzp-button1" style="display: none;">Pay</button>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    var options = {
+      "key": "<%= keyId %>", // Enter the Key ID generated from the Dashboard
+      "amount": "<%= amount %>", // Amount is in currency subunits (paise)
+      "currency": "INR",
+      "name": "Monster Coupon Pvt Ltd", 
+      "description": "Coupon Purchase",
+      "image": "https://yourdomain.com/logo.png", // Replace with your logo URL
+      "order_id": "<%= razorpayOrderId %>", // Razorpay Order ID
+      "handler": function (response){
+        // Payment was successful
+        // You can display a success message or redirect the user
+        alert('Payment successful! Payment ID: ' + response.razorpay_payment_id);
+        window.location.href = '/payment-success';
+      },
+      "prefill": {
+        "name": "<%= customerName %>",
+        "email": "<%= customerEmail %>",
+        "contact": "<%= customerContact %>"
+      },
+      "notes": {
+        "address": "Customer Address"
+      },
+      "theme": {
+        "color": "#3399cc"
+      },
+      "modal": {
+        "ondismiss": function(){
+          // Handle when user closes the payment form without completing payment
+          alert('Payment cancelled.');
+          window.location.href = '/payment-cancelled';
+        }
+      }
+    };
+    var rzp1 = new Razorpay(options);
+    rzp1.open();
+  </script>
+</body>
+</html>
