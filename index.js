@@ -363,7 +363,19 @@ app.post('/payment-callback', async (req, res) => {
       await sendReceipt(order);
 
       // Redirect to a success page or send a success response
-      res.send('Payment successful! You can close this window.');
+      app.get('/payment-success', (req, res) => {
+        const couponCode = req.session.couponCode;
+      
+        if (!couponCode) {
+          return res.send('No coupon code found in session.');
+        }
+      
+        // Clear the coupon code from session after use
+        req.session.couponCode = null;
+      
+        res.render('success', { couponCode });
+      });
+      
     } else {
       res.send('Order not found.');
     }
