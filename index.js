@@ -239,7 +239,18 @@ bot.action(/amount_\d+|custom_value/, async (ctx) => {
     await createPayment(ctx, amount);
   }
 });
+bot.telegram.setWebhook('https://your-render-app.onrender.com/telegram-webhook');
 
+// Start the bot
+bot.launch({
+
+  
+  webhook: {
+    domain: 'https://your-render-app.onrender.com',
+    port: process.env.PORT || 10000,
+    hookPath: '/telegram-webhook', // This is the default path
+  },
+});
 // Handle 'Buy Again' Action
 bot.action('buy_again', async (ctx) => {
   // Restart the purchase flow
