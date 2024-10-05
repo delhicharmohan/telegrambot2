@@ -12,13 +12,13 @@
       "key": "<%= keyId %>", // Enter the Key ID generated from the Dashboard
       "amount": "<%= amount %>", // Amount is in currency subunits (paise)
       "currency": "INR",
-      "name": "Monster Coupon Pvt Ltd", 
+      "name": "Your Business Name", // Replace with your business name
       "description": "Coupon Purchase",
       "image": "https://yourdomain.com/logo.png", // Replace with your logo URL
       "order_id": "<%= razorpayOrderId %>", // Razorpay Order ID
       "handler": function (response){
         // Payment was successful
-        // You can display a success message or redirect the user
+        // Display a success message or redirect the user
         alert('Payment successful! Payment ID: ' + response.razorpay_payment_id);
         window.location.href = '/payment-success';
       },
@@ -33,6 +33,7 @@
       "theme": {
         "color": "#3399cc"
       },
+      "callback_url": "https://<%= hostname %>/payment-callback",
       "modal": {
         "ondismiss": function(){
           // Handle when user closes the payment form without completing payment

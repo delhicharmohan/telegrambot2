@@ -1,4 +1,5 @@
 // index.js
+
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -26,17 +27,23 @@ app.set('views', path.join(__dirname, 'views'));
 // Serve static files (if any)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Connect to MongoDB
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB connected...'))
-  .catch((err) => console.error('MongoDB connection error:', err));
-
 // Initialize bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 // Apply session middleware
 bot.use(session());
+
+// Use Express app with Telegraf
+app.use(bot.webhookCallback('/telegram-webhook'));
+
+// Set Telegram webhook
+bot.telegram.setWebhook(`https://${process.env.RENDER_EXTERNAL_HOSTNAME}/telegram-webhook`);
+
+// Connect to MongoDB
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => console.log('MongoDB connected...'))
+  .catch((err) => console.error('MongoDB connection error:', err));
 
 // Configure nodemailer
 const transporter = nodemailer.createTransport({
@@ -97,7 +104,7 @@ async function createPayment(ctx, amount) {
     await order.save();
 
     // Generate a unique URL for the checkout page
-    const checkoutUrl = `https://telegrambot2-goqb.onrender.com/checkout/${order._id}`;
+    const checkoutUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/checkout/${order._id}`;
 
     // Send the checkout URL to the user
     await ctx.reply(
@@ -239,18 +246,7 @@ bot.action(/amount_\d+|custom_value/, async (ctx) => {
     await createPayment(ctx, amount);
   }
 });
-bot.telegram.setWebhook('https://telegrambot2-goqb.onrender.com/telegram-webhook');
 
-// Start the bot
-bot.launch({
-
-  
-  webhook: {
-    domain: 'https://telegrambot2-goqb.onrender.com',
-    port: process.env.PORT || 3000,
-    hookPath: '/telegram-webhook', // This is the default path
-  },
-});
 // Handle 'Buy Again' Action
 bot.action('buy_again', async (ctx) => {
   // Restart the purchase flow
@@ -272,64 +268,6 @@ bot.action('buy_again', async (ctx) => {
       },
     }
   );
-});
-
-// Route to render the checkout page
-app.get('/checkout/:orderId', async (req, res) => {
-  const orderId = req.params.orderId;
-
-  // Find the order in your database
-  const order = await Order.findById(orderId).populate('userId');
-
-  if (!order) {
-    return res.send('Invalid Order ID');
-  }
-
-  res.render('checkout', {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    amount: order.amount * 100, // Amount in paise
-    razorpayOrderId: order.paymentId,
-    customerName: `${order.userId.firstName || ''} ${order.userId.lastName || ''}`,
-    customerEmail: order.userId.email,
-    customerContact: '', // If you have the contact number
-  });
-});
-
-// Payment callback route
-app.post('/payment-callback', async (req, res) => {
-  // Razorpay sends payment details via POST parameters
-  const {
-    razorpay_payment_id,
-    razorpay_order_id,
-    razorpay_signature,
-  } = req.body;
-  app.use(bot.webhookCallback('/telegram-webhook'));
-  // Verify the signature to ensure payment is legitimate
-  const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
-  hmac.update(razorpay_order_id + '|' + razorpay_payment_id);
-  const generatedSignature = hmac.digest('hex');
-
-  if (generatedSignature === razorpay_signature) {
-    // Payment is successful and verified
-    // Update order status in your database
-    const order = await Order.findOne({ paymentId: razorpay_order_id });
-    if (order) {
-      order.status = 'completed';
-      order.couponCode = 'COUPON-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-      await order.save();
-
-      // Send receipt to the user
-      await sendReceipt(order);
-
-      // Redirect to a success page or send a success response
-      res.send('Payment successful! You can close this window.');
-    } else {
-      res.send('Order not found.');
-    }
-  } else {
-    // Payment failed or signature mismatch
-    res.send('Payment verification failed.');
-  }
 });
 
 // Send Receipt Function
@@ -370,23 +308,78 @@ async function sendReceipt(order) {
             },
           ],
         ],
-      },
+      }
     }
   );
 }
-app.get('/payment-success', (req, res) => {
-  res.send('Thank you for your payment your coupone has been emailed to you! You can close this window.');
+
+// Route to render the checkout page
+app.get('/checkout/:orderId', async (req, res) => {
+  const orderId = req.params.orderId;
+
+  // Find the order in your database
+  const order = await Order.findById(orderId).populate('userId');
+
+  if (!order) {
+    return res.send('Invalid Order ID');
+  }
+
+  res.render('checkout', {
+    keyId: process.env.RAZORPAY_KEY_ID,
+    amount: order.amount * 100, // Amount in paise
+    razorpayOrderId: order.paymentId,
+    customerName: `${order.userId.firstName || ''} ${order.userId.lastName || ''}`,
+    customerEmail: order.userId.email,
+    customerContact: '', // If you have the contact number
+    hostname: process.env.RENDER_EXTERNAL_HOSTNAME, // For callback URLs
+  });
 });
 
-// Start Express Server
+// Payment callback route
+app.post('/payment-callback', async (req, res) => {
+  // Razorpay sends payment details via POST parameters
+  const {
+    razorpay_payment_id,
+    razorpay_order_id,
+    razorpay_signature,
+  } = req.body;
+
+  // Verify the signature to ensure payment is legitimate
+  const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
+  hmac.update(razorpay_order_id + '|' + razorpay_payment_id);
+  const generatedSignature = hmac.digest('hex');
+
+  if (generatedSignature === razorpay_signature) {
+    // Payment is successful and verified
+    // Update order status in your database
+    const order = await Order.findOne({ paymentId: razorpay_order_id });
+    if (order) {
+      order.status = 'completed';
+      order.couponCode = 'COUPON-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+      await order.save();
+
+      // Send receipt to the user
+      await sendReceipt(order);
+
+      // Redirect to a success page or send a success response
+      res.send('Payment successful! You can close this window.');
+    } else {
+      res.send('Order not found.');
+    }
+  } else {
+    // Payment failed or signature mismatch
+    res.send('Payment verification failed.');
+  }
+});
+
+// Additional routes if any
+// For example, a health check route
+app.get('/', (req, res) => {
+  res.send('Bot is running');
+});
+
+// Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Express server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
-// Payment cancellation page
-app.get('/payment-cancelled', (req, res) => {
-  res.send('Payment was cancelled. You can close this window and try again.');
-});
-// Start the bot
-bot.launch();
-console.log('Telegram bot started...');
