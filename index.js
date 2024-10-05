@@ -9,6 +9,7 @@ const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const crypto = require('crypto');
+const expressSession = require('express-session');
 
 // Models
 const User = require('./models/User');
