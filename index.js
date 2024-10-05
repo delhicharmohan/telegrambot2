@@ -239,14 +239,14 @@ bot.action(/amount_\d+|custom_value/, async (ctx) => {
     await createPayment(ctx, amount);
   }
 });
-bot.telegram.setWebhook('https://your-render-app.onrender.com/telegram-webhook');
+bot.telegram.setWebhook('https://telegrambot2-goqb.onrender.com/telegram-webhook');
 
 // Start the bot
 bot.launch({
 
   
   webhook: {
-    domain: 'https://your-render-app.onrender.com',
+    domain: 'https://telegrambot2-goqb.onrender.com',
     port: process.env.PORT || 10000,
     hookPath: '/telegram-webhook', // This is the default path
   },
@@ -303,7 +303,7 @@ app.post('/payment-callback', async (req, res) => {
     razorpay_order_id,
     razorpay_signature,
   } = req.body;
-
+  app.use(bot.webhookCallback('/telegram-webhook'));
   // Verify the signature to ensure payment is legitimate
   const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
   hmac.update(razorpay_order_id + '|' + razorpay_payment_id);
