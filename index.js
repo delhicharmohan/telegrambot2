@@ -97,7 +97,7 @@ async function createPayment(ctx, amount) {
     await order.save();
 
     // Generate a unique URL for the checkout page
-    const checkoutUrl = `https://yourdomain.com/checkout/${order._id}`;
+    const checkoutUrl = `https://telegrambot2-goqb.onrender.com/checkout/${order._id}`;
 
     // Send the checkout URL to the user
     await ctx.reply(
