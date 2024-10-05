@@ -247,7 +247,7 @@ bot.launch({
   
   webhook: {
     domain: 'https://telegrambot2-goqb.onrender.com',
-    port: process.env.PORT || 10000,
+    port: process.env.PORT || 3000,
     hookPath: '/telegram-webhook', // This is the default path
   },
 });
