@@ -1,0 +1,89 @@
+<!-- views/success.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Payment Success</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      background: linear-gradient(to bottom, #6a11cb, #2575fc);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .success-container {
+      background: #ffffff;
+      color: #333333;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .coupon-code {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #4CAF50;
+      background-color: #f9f9f9;
+      padding: 10px;
+      border-radius: 5px;
+      margin: 15px 0;
+      display: inline-block;
+    }
+
+    .btn-copy {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .btn-copy:hover {
+      background-color: #45a049;
+    }
+
+    .success-icon {
+      font-size: 4rem;
+      color: #4CAF50;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="success-container">
+      <div class="success-icon">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <h1>Payment Successful!</h1>
+      <p>Thank you for your purchase. Your coupon code is:</p>
+      <div id="couponCode" class="coupon-code"><%= couponCode %></div>
+      <button class="btn btn-copy" onclick="copyToClipboard()">Click to Copy Coupon Code</button>
+    </div>
+  </div>
+
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <script>
+    function copyToClipboard() {
+      var text = document.getElementById("couponCode").innerText;
+      navigator.clipboard.writeText(text).then(function() {
+        alert('Coupon code copied to clipboard!');
+      }, function(err) {
+        alert('Failed to copy coupon code');
+      });
+    }
+  </script>
+</body>
+</html>

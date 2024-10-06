@@ -18,9 +18,29 @@
       "order_id": "<%= razorpayOrderId %>", // Razorpay Order ID
       "handler": function (response){
         // Payment was successful
-        // Display a success message or redirect the user
-        alert('Payment successful! Payment ID: ' + response.razorpay_payment_id);
-        window.location.href = '/payment-success';
+        // Submit payment details to the server
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = '/payment-callback';
+
+        var hiddenFields = {
+          'razorpay_payment_id': response.razorpay_payment_id,
+          'razorpay_order_id': response.razorpay_order_id,
+          'razorpay_signature': response.razorpay_signature
+        };
+
+        for (var key in hiddenFields) {
+          if (hiddenFields.hasOwnProperty(key)) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = hiddenFields[key];
+            form.appendChild(input);
+          }
+        }
+
+        document.body.appendChild(form);
+        form.submit();
       },
       "prefill": {
         "name": "<%= customerName %>",
@@ -33,7 +53,7 @@
       "theme": {
         "color": "#3399cc"
       },
-      "callback_url": "https://telegrambot2-goqb.onrender.com/payment-callback",
+      // Remove callback_url to avoid conflicts
       "modal": {
         "ondismiss": function(){
           // Handle when user closes the payment form without completing payment

@@ -3,7 +3,7 @@
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
-const { Telegraf, session } = require('telegraf');
+const { Telegraf, session: telegrafSession } = require('telegraf');
 const mongoose = require('mongoose');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
@@ -21,6 +21,14 @@ app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Configure session middleware
+app.use(expressSession({
+  secret: 'your-secret-key', // Replace with a secure secret key
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false } // Set to true if using HTTPS
+}));
+
 // Set up view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -31,28 +39,50 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Initialize bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-// Apply session middleware
-bot.use(session());
+// Apply session middleware for bot
+bot.use(telegrafSession());
 
-// Use Express app with Telegraf
-app.use(bot.webhookCallback('/telegram-webhook'));
+// Determine if in production or development
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Set Telegram webhook
-bot.telegram.setWebhook(`https://${process.env.RENDER_EXTERNAL_HOSTNAME}/telegram-webhook`);
+if (isProduction) {
+  // Set webhook for production
+  const DOMAIN = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
+  bot.telegram.setWebhook(`${DOMAIN}/telegram-webhook`)
+    .then(() => console.log(`Webhook set successfully at ${DOMAIN}/telegram-webhook`))
+    .catch((err) => console.error('Error setting webhook:', err));
+} else {
+  // Use long polling for local development
+  bot.launch()
+    .then(() => console.log('Bot started using long polling'))
+    .catch((err) => console.error('Error starting bot with long polling:', err));
+}
+
+// Use Express app with Telegraf (Webhook configuration)
+if (isProduction) {
+  app.use(bot.webhookCallback('/telegram-webhook'));
+}
 
 // Connect to MongoDB
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected...'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
 // Configure nodemailer
+
+// Setup nodemailer for email using Hostinger SMTP
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Replace with your email service
+  host: "smtp.hostinger.com",
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  tls: {
+    rejectUnauthorized: false,
+  }
 });
 
 // Initialize Razorpay
@@ -332,7 +362,6 @@ app.get('/checkout/:orderId', async (req, res) => {
     customerName: `${order.userId.firstName || ''} ${order.userId.lastName || ''}`,
     customerEmail: order.userId.email,
     customerContact: '', // If you have the contact number
-    hostname: process.env.RENDER_EXTERNAL_HOSTNAME, // For callback URLs
   });
 });
 
@@ -353,7 +382,7 @@ app.post('/payment-callback', async (req, res) => {
   if (generatedSignature === razorpay_signature) {
     // Payment is successful and verified
     // Update order status in your database
-    const order = await Order.findOne({ paymentId: razorpay_order_id });
+    const order = await Order.findOne({ paymentId: razorpay_order_id }).populate('userId');
     if (order) {
       order.status = 'completed';
       order.couponCode = 'COUPON-' + Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -362,28 +391,34 @@ app.post('/payment-callback', async (req, res) => {
       // Send receipt to the user
       await sendReceipt(order);
 
-      // Redirect to a success page or send a success response
-      app.get('/payment-success', (req, res) => {
-        const couponCode = req.session.couponCode;
-      
-        if (!couponCode) {
-          return res.send('No coupon code found in session.');
-        }
-      
-        // Clear the coupon code from session after use
-        req.session.couponCode = null;
-      
-        res.render('success', { couponCode });
-      });
-      
+      // Store coupon code in session
+      req.session.couponCode = order.couponCode;
+
+      // Redirect to the success page
+      return res.redirect('/payment-success');
     } else {
-      res.send('Order not found.');
+      return res.send('Order not found.');
     }
   } else {
     // Payment failed or signature mismatch
-    res.send('Payment verification failed.');
+    return res.send('Payment verification failed.');
   }
 });
+
+// Success page route
+app.get('/payment-success', (req, res) => {
+  const couponCode = req.session.couponCode;
+
+  if (!couponCode) {
+    return res.send('No coupon code found in session.');
+  }
+
+  // Clear the coupon code from session after use
+  req.session.couponCode = null;
+
+  res.render('success', { couponCode });
+});
+
 
 // Additional routes if any
 // For example, a health check route
