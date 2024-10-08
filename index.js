@@ -40,7 +40,7 @@ app.use(expressSession({
 //   credentials: true, // Allow cookies to be sent
 // }));
 
-const whitelist = ['telegrambot2-goqb.onrender.com','http://localhost:3000']; // Whitelisted domains
+const whitelist = ['https://telegrambot2-goqb.onrender.com','http://localhost:3000', 'https://*.razorpay.com']; // Whitelisted domains
  
  const corsOptions = {
    origin: function (origin, callback) {
