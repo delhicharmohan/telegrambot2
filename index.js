@@ -35,10 +35,25 @@ app.use(expressSession({
 }));
 // In your backend server setup
 
-app.use(cors({
-  origin: 'http://localhost:3000', // Replace with your frontend URL
-  credentials: true, // Allow cookies to be sent
-}));
+// app.use(cors({
+//   origin: 'telegrambot2-goqb.onrender.com', // Replace with your frontend URL
+//   credentials: true, // Allow cookies to be sent
+// }));
+
+const whitelist = ['telegrambot2-goqb.onrender.com','http://localhost:3000']; // Whitelisted domains
+ 
+ const corsOptions = {
+   origin: function (origin, callback) {
+     if (whitelist.indexOf(origin) !== -1 || !origin) { // Allow requests with no origin (like mobile apps or curl requests)
+       callback(null, true);
+     } else {
+       callback(new Error('Not allowed by CORS'));   
+ 
+     }
+   }
+ }
+ 
+ app.use(cors(corsOptions));
 
 // Centralized Authentication Middleware
 async function authenticateUser(req, res, next) {
@@ -230,8 +245,6 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected...'))
   .catch((err) => console.error('MongoDB connection error:', err));
-
-// Configure nodemailer
 
 // Setup nodemailer for email using Hostinger SMTP
 const transporter = nodemailer.createTransport({
