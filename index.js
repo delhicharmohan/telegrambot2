@@ -568,11 +568,8 @@ app.post('/payment-callback', async (req, res) => {
       // Send receipt to the user
       await sendReceipt(order);
 
-      // Store coupon code in session
-      req.session.couponCode = order.couponCode;
-
-      // Redirect to the success page
-      return res.redirect('/payment-success');
+      // Redirect to the success page with orderId
+      return res.redirect(`/payment-success?orderId=${order._id}`);
     } else {
       return res.send('Order not found.');
     }
@@ -581,22 +578,32 @@ app.post('/payment-callback', async (req, res) => {
     return res.send('Payment verification failed.');
   }
 });
+app.get('/payment-success', async (req, res) => {
+  const orderId = req.query.orderId;
 
-// Success page route
-app.get('/payment-success', (req, res) => {
-  const couponCode = req.session.couponCode;
-
-  if (!couponCode) {
-    return res.send('No coupon code found in session.');
+  if (!orderId) {
+    return res.send('No orderId provided.');
   }
 
-  // Clear the coupon code from session after use
-  req.session.couponCode = null;
+  try {
+    const order = await Order.findById(orderId);
 
-  res.render('success', { couponCode });
+    if (!order) {
+      return res.send('Order not found.');
+    }
+
+    const couponCode = order.couponCode;
+
+    if (!couponCode) {
+      return res.send('Coupon code not found.');
+    }
+
+    res.render('success', { couponCode });
+  } catch (error) {
+    console.error('Error retrieving order:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
-
-// Payment cancelled route
 app.get('/payment-cancelled', (req, res) => {
   res.render('cancel');
 });
