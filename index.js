@@ -216,6 +216,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Initialize bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
+
 // Apply session middleware for bot
 bot.use(telegrafSession());
 
@@ -329,10 +330,9 @@ async function createPayment(ctx, amount) {
 
 // Start Conversation
 bot.start(async (ctx) => {
-  console.error('Error in /start command:', error);
-  const telegramId = ctx.from.id.toString();
-
   try {
+    const telegramId = ctx.from.id.toString();
+
     // Check if user exists
     let user = await User.findOne({ telegramId });
 
@@ -350,6 +350,7 @@ bot.start(async (ctx) => {
     await ctx.reply('An error occurred. Please try again later.');
   }
 });
+
 
 // Collect Email or Handle Custom Amount Input
 bot.on('text', async (ctx) => {
