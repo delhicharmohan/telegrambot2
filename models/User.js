@@ -2,8 +2,8 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-  telegramId: { type: String, required: true, unique: true },
-  email: { type: String }, // Remove 'required: true'
+  telegramId: { type: String },
+  email: { type: String, required: true }, // Remove 'required: true'
   firstName: { type: String },
   lastName: { type: String },
 });
