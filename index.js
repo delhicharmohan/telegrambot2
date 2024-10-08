@@ -329,6 +329,7 @@ async function createPayment(ctx, amount) {
 
 // Start Conversation
 bot.start(async (ctx) => {
+  console.error('Error in /start command:', error);
   const telegramId = ctx.from.id.toString();
 
   try {
@@ -599,8 +600,7 @@ app.get('/payment-cancelled', (req, res) => {
   res.render('cancel');
 });
 
-// Middleware to authenticate merchants using API keys
-// Middleware to authenticate merchants using xkey and HMAC hash
+// Middleware to authenticate merchants using API xkey and HMAC hash
 async function authenticateMerchant(req, res, next) {
   try {
     const xkey = req.headers['xkey'];
