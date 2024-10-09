@@ -707,6 +707,7 @@ app.post('/api/redeem-coupon', authenticateMerchant, async (req, res) => {
     couponCode: order.couponCode,
     redeemedAt: order.redeemedAt,
     merchant: req.merchant.name,
+    amount: order.amount,
     redemptionLog,
   });
 
