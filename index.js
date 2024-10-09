@@ -337,8 +337,12 @@ bot.start(async (ctx) => {
     let user = await User.findOne({ telegramId });
 
     if (!user) {
-      // Save new user without email
-      user = new User({ telegramId });
+      // Save new user with conversationState set to 'awaitingEmail'
+      user = new User({ telegramId, conversationState: 'awaitingEmail' });
+      await user.save();
+    } else {
+      // Update conversationState to 'awaitingEmail'
+      user.conversationState = 'awaitingEmail';
       await user.save();
     }
 
@@ -351,35 +355,29 @@ bot.start(async (ctx) => {
   }
 });
 
-
 // Collect Email or Handle Custom Amount Input
 bot.on('text', async (ctx) => {
-  // Initialize ctx.session if undefined
-  if (!ctx.session) {
-    ctx.session = {};
-  }
-
   const telegramId = ctx.from.id.toString();
   let user = await User.findOne({ telegramId });
 
-  console.log('User object:', user);
-  console.log('Session data:', ctx.session);
+  if (!user) {
+    // If user doesn't exist, prompt them to start the bot
+    await ctx.reply('Please start the bot by sending /start.');
+    return;
+  }
 
-  if (user && !user.email) {
-    const email = ctx.message.text;
+  console.log('User object:', user);
+  console.log('Conversation state:', user.conversationState);
+
+  if (user.conversationState === 'awaitingEmail') {
+    const email = ctx.message.text.trim();
 
     // Simple email validation
     if (/^\S+@\S+\.\S+$/.test(email)) {
       user.email = email;
-
-      try {
-        await user.save();
-        console.log('Email saved:', user.email);
-      } catch (error) {
-        console.error('Error saving user:', error);
-        await ctx.reply('An error occurred while saving your email. Please try again later.');
-        return;
-      }
+      user.conversationState = 'idle'; // Reset the state
+      await user.save();
+      console.log('Email saved:', user.email);
 
       await ctx.reply(
         "Thank you! Please choose a coupon value from the options below or create your custom amount.",
@@ -402,17 +400,20 @@ bot.on('text', async (ctx) => {
     } else {
       await ctx.reply('Please enter a valid email address.');
     }
-  } else if (ctx.session.awaitingAmount) {
-    const amount = parseInt(ctx.message.text);
+  } else if (user.conversationState === 'awaitingAmount') {
+    const amountText = ctx.message.text.trim();
+    const amount = parseInt(amountText);
 
     if (isNaN(amount) || amount <= 0) {
       await ctx.reply('Please enter a valid amount.');
     } else {
-      ctx.session.awaitingAmount = false;
+      // Reset the conversation state
+      user.conversationState = 'idle';
+      await user.save();
       await createPayment(ctx, amount);
     }
-  } else if (user && user.email && !ctx.session.awaitingAmount) {
-    // User has provided email but is not awaiting amount
+  } else {
+    // User is idle or in an unknown state
     await ctx.reply(
       "Please choose a coupon value from the options below or create your custom amount.",
       {
@@ -430,22 +431,27 @@ bot.on('text', async (ctx) => {
         },
       }
     );
-  } else {
-    await ctx.reply('Please use the provided options to proceed.');
   }
 });
 
 // Handle Denomination Selection
 bot.action(/amount_\d+|custom_value/, async (ctx) => {
-  if (!ctx.session) {
-    ctx.session = {};
+  const telegramId = ctx.from.id.toString();
+  let user = await User.findOne({ telegramId });
+
+  if (!user) {
+    await ctx.reply('Please start the bot by sending /start.');
+    return;
   }
 
   const action = ctx.match[0];
   console.log('Action triggered with data:', action);
 
   if (action === 'custom_value') {
-    ctx.session.awaitingAmount = true;
+    // Set user's conversation state to 'awaitingAmount'
+    user.conversationState = 'awaitingAmount';
+    await user.save();
+
     await ctx.reply(
       "Please enter the amount you'd like to purchase a coupon for (e.g., 5000)."
     );
@@ -457,6 +463,18 @@ bot.action(/amount_\d+|custom_value/, async (ctx) => {
 
 // Handle 'Buy Again' Action
 bot.action('buy_again', async (ctx) => {
+  const telegramId = ctx.from.id.toString();
+  let user = await User.findOne({ telegramId });
+
+  if (!user) {
+    await ctx.reply('Please start the bot by sending /start.');
+    return;
+  }
+
+  // Reset conversation state
+  user.conversationState = 'idle';
+  await user.save();
+
   // Restart the purchase flow
   await ctx.deleteMessage();
   await ctx.reply(
@@ -498,6 +516,8 @@ async function sendReceipt(order) {
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
       console.error('Error sending email:', error);
+    } else {
+      console.log('Email sent:', info.response);
     }
   });
 
@@ -516,7 +536,7 @@ async function sendReceipt(order) {
             },
           ],
         ],
-      }
+      },
     }
   );
 }
@@ -568,8 +588,11 @@ app.post('/payment-callback', async (req, res) => {
       // Send receipt to the user
       await sendReceipt(order);
 
-      // Redirect to the success page with orderId
-      return res.redirect(`/payment-success?orderId=${order._id}`);
+      // Store coupon code in session
+      req.session.couponCode = order.couponCode;
+
+      // Redirect to the success page
+      return res.redirect('/payment-success');
     } else {
       return res.send('Order not found.');
     }
@@ -578,32 +601,22 @@ app.post('/payment-callback', async (req, res) => {
     return res.send('Payment verification failed.');
   }
 });
-app.get('/payment-success', async (req, res) => {
-  const orderId = req.query.orderId;
 
-  if (!orderId) {
-    return res.send('No orderId provided.');
+// Success page route
+app.get('/payment-success', (req, res) => {
+  const couponCode = req.session.couponCode;
+
+  if (!couponCode) {
+    return res.send('No coupon code found in session.');
   }
 
-  try {
-    const order = await Order.findById(orderId);
+  // Clear the coupon code from session after use
+  req.session.couponCode = null;
 
-    if (!order) {
-      return res.send('Order not found.');
-    }
-
-    const couponCode = order.couponCode;
-
-    if (!couponCode) {
-      return res.send('Coupon code not found.');
-    }
-
-    res.render('success', { couponCode });
-  } catch (error) {
-    console.error('Error retrieving order:', error);
-    res.status(500).send('Internal Server Error');
-  }
+  res.render('success', { couponCode });
 });
+
+// Payment cancelled route
 app.get('/payment-cancelled', (req, res) => {
   res.render('cancel');
 });

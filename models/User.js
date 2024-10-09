@@ -5,6 +5,7 @@ const UserSchema = new mongoose.Schema({
   email: { type: String }, // Remove 'required: true' if email is optional
   firstName: { type: String },
   lastName: { type: String },
+  conversationState: { type: String, default: 'awaitingEmail' },
 });
 
 module.exports = mongoose.model('User', UserSchema);
